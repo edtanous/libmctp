@@ -3,44 +3,44 @@
 #include <err.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <unistd.h>
 #include <sys/poll.h>
 #include <sys/socket.h>
+#include <unistd.h>
 
-#include "libmctp.h"
 #include "libmctp-serial.h"
+#include "libmctp.h"
 
-static void rx_message(uint8_t eid, void *data, void *msg, size_t len)
+static void rx_message(uint8_t eid, void* data, void* msg, size_t len)
 {
-	(void)eid;
-	(void)data;
-	write(STDOUT_FILENO, msg, len);
+    (void)eid;
+    (void)data;
+    write(STDOUT_FILENO, msg, len);
 }
 
 int main(void)
 {
-	struct mctp_binding_serial *serial;
-	struct mctp *mctp;
-	int rc;
+    struct mctp_binding_serial* serial;
+    struct mctp* mctp;
+    int rc;
 
-	mctp = mctp_init();
-	assert(mctp);
+    mctp = mctp_init();
+    assert(mctp);
 
-	serial = mctp_serial_init();
-	assert(serial);
+    serial = mctp_serial_init();
+    assert(serial);
 
-	mctp_serial_open_fd(serial, STDIN_FILENO);
+    mctp_serial_open_fd(serial, STDIN_FILENO);
 
-	mctp_serial_register_bus(serial, mctp, 8);
+    mctp_serial_register_bus(serial, mctp, 8);
 
-	mctp_set_rx_all(mctp, rx_message, NULL);
+    mctp_set_rx_all(mctp, rx_message, NULL);
 
-	for (;;) {
-		rc = mctp_serial_read(serial);
-		if (rc)
-			break;
-	}
+    for (;;)
+    {
+        rc = mctp_serial_read(serial);
+        if (rc)
+            break;
+    }
 
-	return EXIT_SUCCESS;
-
+    return EXIT_SUCCESS;
 }
