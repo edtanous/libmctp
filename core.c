@@ -264,9 +264,11 @@ void mctp_bus_rx(struct mctp* mctp, unsigned long bus_id,
 
     hdr = mctp_pktbuf_hdr(pkt);
 
-    if (hdr->dest != bus->eid)
+    if (hdr->dest != bus->eid){
         /* @todo: non-local packet routing */
+        fprintf(stderr, "Ignoring non-local packet routing dest: %d  eid: %d\n", hdr->dest, bus->eid);
         return;
+    }
 
     flags = hdr->flags_seq_tag & (MCTP_HDR_FLAG_SOM | MCTP_HDR_FLAG_EOM);
     tag = (hdr->flags_seq_tag >> MCTP_HDR_TAG_SHIFT) & MCTP_HDR_TAG_MASK;
@@ -278,7 +280,8 @@ void mctp_bus_rx(struct mctp* mctp, unsigned long bus_id,
             /* single-packet message - send straight up to rx function,
              * no need to create a message context */
             len = pkt->end - pkt->mctp_hdr_off - sizeof(struct mctp_hdr);
-            p = pkt->data + pkt->mctp_hdr_off + sizeof(struct mctp_hdr),
+            p = pkt->data + pkt->mctp_hdr_off + sizeof(struct mctp_hdr);
+
             mctp->message_rx(bus->eid, mctp->message_rx_data, p, len);
             break;
 
@@ -294,11 +297,12 @@ void mctp_bus_rx(struct mctp* mctp, unsigned long bus_id,
             else
             {
                 ctx = mctp_msg_ctx_create(mctp, hdr->src, tag);
-                if (((ctx->last_seq + 1) % 4) != seq)
-                {
-                    mctp_msg_ctx_drop(ctx);
-                    return;
-                }
+                // SEE TODO BELOW
+                //if (((ctx->last_seq + 1) % 4) != seq)
+                //{
+                //    mctp_msg_ctx_drop(ctx);
+                //    return;
+                //}
             }
 
             rc = mctp_msg_ctx_add_pkt(ctx, pkt);
@@ -318,11 +322,16 @@ void mctp_bus_rx(struct mctp* mctp, unsigned long bus_id,
             if (!ctx)
                 return;
 
-            if (((ctx->last_seq + 1) % 4) != seq)
-            {
-                mctp_msg_ctx_drop(ctx);
-                return;
-            }
+            //  TODO(ed) The last EOM packet seems to always respond with a sequence
+            //  number of 1.  Understand why
+            //  Minor understanding.....  sequence number is allowed to reset
+            //  between sequences.  Need a "sequence number is valid" somewhere?
+            //if (((ctx->last_seq + 1) % 4) != seq)
+            //{
+            //    fprintf(stderr, "Sequence number %d does not match expected %d\n", ((ctx->last_seq + 1) % 4), seq);
+            //    mctp_msg_ctx_drop(ctx);
+            //    return;
+            //}
 
             rc = mctp_msg_ctx_add_pkt(ctx, pkt);
             if (!rc)
@@ -332,6 +341,18 @@ void mctp_bus_rx(struct mctp* mctp, unsigned long bus_id,
             }
 
             mctp_msg_ctx_drop(ctx);
+            break;
+        default:
+            ctx = mctp_msg_ctx_lookup(mctp, hdr->src, tag);
+            if (!ctx)
+                return;
+
+            rc = mctp_msg_ctx_add_pkt(ctx, pkt);
+            if (!rc)
+            {
+                return;
+            }
+            // Neither end nor beggining
             break;
     }
 }
