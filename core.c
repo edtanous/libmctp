@@ -264,9 +264,11 @@ void mctp_bus_rx(struct mctp* mctp, unsigned long bus_id,
 
     hdr = mctp_pktbuf_hdr(pkt);
 
-    if (hdr->dest != bus->eid){
+    if (hdr->dest != bus->eid)
+    {
         /* @todo: non-local packet routing */
-        fprintf(stderr, "Ignoring non-local packet routing dest: %d  eid: %d\n", hdr->dest, bus->eid);
+        fprintf(stderr, "Ignoring non-local packet routing dest: %d  eid: %d\n",
+                hdr->dest, bus->eid);
         return;
     }
 
@@ -297,16 +299,10 @@ void mctp_bus_rx(struct mctp* mctp, unsigned long bus_id,
             else
             {
                 ctx = mctp_msg_ctx_create(mctp, hdr->src, tag);
-                // SEE TODO BELOW
-                //if (((ctx->last_seq + 1) % 4) != seq)
-                //{
-                //    mctp_msg_ctx_drop(ctx);
-                //    return;
-                //}
             }
 
             rc = mctp_msg_ctx_add_pkt(ctx, pkt);
-            if (rc)
+            if (rc != 0)
             {
                 mctp_msg_ctx_drop(ctx);
             }
@@ -314,7 +310,6 @@ void mctp_bus_rx(struct mctp* mctp, unsigned long bus_id,
             {
                 ctx->last_seq = seq;
             }
-
             break;
 
         case MCTP_HDR_FLAG_EOM:
@@ -322,19 +317,19 @@ void mctp_bus_rx(struct mctp* mctp, unsigned long bus_id,
             if (!ctx)
                 return;
 
-            //  TODO(ed) The last EOM packet seems to always respond with a sequence
-            //  number of 1.  Understand why
-            //  Minor understanding.....  sequence number is allowed to reset
-            //  between sequences.  Need a "sequence number is valid" somewhere?
-            //if (((ctx->last_seq + 1) % 4) != seq)
-            //{
-            //    fprintf(stderr, "Sequence number %d does not match expected %d\n", ((ctx->last_seq + 1) % 4), seq);
-            //    mctp_msg_ctx_drop(ctx);
-            //    return;
-            //}
+            if (((ctx->last_seq + 1) % 4) != seq)
+            {
+                fprintf(
+                    stderr,
+                    "Sequence number %d does not match expected %d in EOM\n",
+                    seq, ((ctx->last_seq + 1) % 4));
+                mctp_msg_ctx_drop(ctx);
+                return;
+            }
+            ctx->last_seq = seq;
 
             rc = mctp_msg_ctx_add_pkt(ctx, pkt);
-            if (!rc)
+            if (rc == 0)
             {
                 mctp->message_rx(bus->eid, mctp->message_rx_data, ctx->buf,
                                  ctx->buf_size);
@@ -343,16 +338,29 @@ void mctp_bus_rx(struct mctp* mctp, unsigned long bus_id,
             mctp_msg_ctx_drop(ctx);
             break;
         default:
+            // Neither SOM
             ctx = mctp_msg_ctx_lookup(mctp, hdr->src, tag);
             if (!ctx)
                 return;
 
-            rc = mctp_msg_ctx_add_pkt(ctx, pkt);
-            if (!rc)
+            if (((ctx->last_seq + 1) % 4) != seq)
             {
+                fprintf(stderr,
+                        "Sequence number %d does not match expected %d\n", seq,
+                        ((ctx->last_seq + 1) % 4));
+                mctp_msg_ctx_drop(ctx);
                 return;
             }
-            // Neither end nor beggining
+            rc = mctp_msg_ctx_add_pkt(ctx, pkt);
+            if (rc != 0)
+            {
+                mctp_msg_ctx_drop(ctx);
+            }
+            else
+            {
+                ctx->last_seq = seq;
+            }
+
             break;
     }
 }
