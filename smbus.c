@@ -118,13 +118,11 @@ int mctp_smbus_read(struct mctp_binding_smbus* smbus)
         mctp_prerr("Failed to seek");
         return -1;
     }
-    fprintf(stderr, "Reading from %d\n", smbus->in_fd);
     len = read(smbus->in_fd, smbus->rxbuf, sizeof(smbus->rxbuf));
-    fprintf(stderr, "Got packet of size %d\n", len);
     if (len < sizeof(*hdr)){
-        mctp_prerr("Did not read enough bytes for smbus header");
         return -1;
     }
+    mctp_prdebug("Got packet of size %d\n", len);
 
     hdr = (void*)smbus->rxbuf;
     if (hdr->destination_slave_address != (MCTP_SOURCE_SLAVE_ADDRESS & ~1)){
@@ -143,19 +141,11 @@ int mctp_smbus_read(struct mctp_binding_smbus* smbus)
         return 0;
     }
 
-    printf("len=%d\n", hdr->byte_count);
-
     if (len < 0)
     {
         mctp_prerr("can't read from smbus device: %m");
         return -1;
     }
-    fprintf(stderr, "Smbus got a message of length %d\n", len);
-    for (size_t i = 0; i < len; i++)
-    {
-        printf("%02X ", smbus->rxbuf[i]);
-    }
-    printf("\n");
 
     smbus->rx_pkt = mctp_pktbuf_alloc(0);
     assert(smbus->rx_pkt);

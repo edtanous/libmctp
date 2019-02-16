@@ -267,7 +267,7 @@ void mctp_bus_rx(struct mctp* mctp, unsigned long bus_id,
     if (hdr->dest != bus->eid)
     {
         /* @todo: non-local packet routing */
-        fprintf(stderr, "Ignoring non-local packet routing dest: %d  eid: %d\n",
+        mctp_prdebug("Ignoring non-local packet routing dest: %d  eid: %d\n",
                 hdr->dest, bus->eid);
         return;
     }
@@ -319,8 +319,7 @@ void mctp_bus_rx(struct mctp* mctp, unsigned long bus_id,
 
             if (((ctx->last_seq + 1) % 4) != seq)
             {
-                fprintf(
-                    stderr,
+                mctp_prdebug(
                     "Sequence number %d does not match expected %d in EOM\n",
                     seq, ((ctx->last_seq + 1) % 4));
                 mctp_msg_ctx_drop(ctx);
@@ -345,7 +344,7 @@ void mctp_bus_rx(struct mctp* mctp, unsigned long bus_id,
 
             if (((ctx->last_seq + 1) % 4) != seq)
             {
-                fprintf(stderr,
+                mctp_prdebug(
                         "Sequence number %d does not match expected %d\n", seq,
                         ((ctx->last_seq + 1) % 4));
                 mctp_msg_ctx_drop(ctx);

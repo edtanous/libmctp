@@ -17,7 +17,7 @@
 #define NVME_MI_MCTP_INTEGRITY_CHECK (1 << 7)
 
 #define NVME_MI_HDR_FLAG_ROR (1 << 7)
-#define NVME_MI_HDR_FLAG_MSG_TYPE_MASK 0x78
+#define NVME_MI_HDR_FLAG_MSG_TYPE_MASK 0x0F
 #define NVME_MI_HDR_FLAG_MSG_TYPE_SHIFT (3)
 
 enum NVME_MI_HDR_MESSAGE_TYPE
@@ -55,7 +55,8 @@ struct nvme_mi_msg_request_header
     uint8_t message_type;
     uint8_t flags;
     uint16_t reserved;
-};
+}__attribute__((packed));
+
 
 struct nvme_mi_msg_response_header
 {
@@ -63,17 +64,33 @@ struct nvme_mi_msg_response_header
     uint8_t flags;
     uint16_t reserved;
     uint8_t status;
-};
+}__attribute__((packed));
+
 
 struct nvme_mi_msg_trailer
 {
     uint32_t message_integrity_check;
 };
 
-static void rx_message(uint8_t eid, void* data, void* msg, size_t len)
+struct nvme_mi_controller_health
+{
+    uint8_t unknown1;
+    uint8_t unknown2;
+    uint8_t unknown3;
+    uint16_t controller_identifier;
+    uint16_t controller_status;
+    uint16_t temperature_kelvin;
+    uint8_t percentage_used;
+    uint8_t available_spare;
+    uint8_t critical_warning;
+}__attribute__((packed));
+
+static void
+    rx_message(uint8_t eid, void* data, void* msg, size_t len)
 {
     struct nvme_mi_msg_response_header* header;
     struct nvme_mi_msg_trailer* trailer;
+    struct nvme_mi_controller_health* health;
     uint8_t* message_data;
     size_t message_len;
 
@@ -106,14 +123,28 @@ static void rx_message(uint8_t eid, void* data, void* msg, size_t len)
     {
         fprintf(stderr, "CRC mismatch.  Got=%08X expected=%08X\n",
                 trailer->message_integrity_check, trailer);
-        //TODO(ed)
-        //return;
+        return;
+    }
+
+    if (((header->flags >> NVME_MI_HDR_FLAG_MSG_TYPE_SHIFT) &
+         NVME_MI_HDR_FLAG_MSG_TYPE_MASK) == NVME_MI_HDR_MESSAGE_TYPE_MI_COMMAND)
+    {
+
+        fprintf(stderr, "message_len=%d  sizeof=%d\n", message_len,
+                sizeof(*health));
+        if (message_len >= sizeof(*health))
+        {
+            health = (void*)message_data;
+            fprintf(stderr, "Controller temperature %d kelvin\n",
+                    health->temperature_kelvin);
+            fprintf(stderr, "percentage used %d\n", health->percentage_used);
+        }
     }
 
     fprintf(stderr, "Message length %d\n", message_len);
     for (size_t i = 0; i < message_len; i++)
     {
-        fprintf(stderr, "%02X ", *((uint8_t*)msg + i));
+        fprintf(stderr, "%02X ", *((uint8_t*)message_data + i));
     }
     fprintf(stderr, "\n");
 }
@@ -145,18 +176,19 @@ int main(void)
     mctp_set_rx_all(mctp, rx_message, NULL);
 
     pollfds[0].fd = mctp_smbus_get_in_fd(smbus);
-    pollfds[0].events = POLLPRI;
+    pollfds[0].events = POLLIN | POLLPRI;
     pollfds[1].fd = mctp_smbus_get_out_fd(smbus);
     pollfds[1].events = POLLIN;
     pollfds[2].fd = STDIN_FILENO;
     pollfds[2].events = POLLIN;
     n = 1;
 
-    uint8_t vpd_read_256[] = {0x05, 0x00, 0x00, 0x00, 
-                             0x00, 0x00, 0x00, 0x00, 
-                             0xff, 0x00, 0x00, 0x00};
+    uint8_t vpd_read_256[] = {0x05, 0x00, 0x00, 0x00, 0x00, 0x00,
+                              0x00, 0x00, 0xff, 0x00, 0x00, 0x00};
+    uint8_t health_poll[] = {0x02, 0x00, 0x00, 0x00, 0x00, 0x00,
+                             0xfe, 0x80, 0x1f, 0x00, 0x00, 0x00};
 
-    uint8_t message[sizeof(vpd_read_256) + sizeof(*header) + sizeof(*trailer)];
+    uint8_t message[sizeof(health_poll) + sizeof(*header) + sizeof(*trailer)];
 
     header = (void*)message;
     header->message_type = NVME_MI_MESSAGE_TYPE | NVME_MI_MCTP_INTEGRITY_CHECK;
@@ -165,7 +197,7 @@ int main(void)
                     NVME_MI_HDR_COMMAND_SLOT_0;
     header->reserved = 0;
     // TODO(ed) range checks
-    memcpy(message + sizeof(*header), vpd_read_256, sizeof(vpd_read_256));
+    memcpy(message + sizeof(*header), health_poll, sizeof(health_poll));
 
     trailer = (void*)message + sizeof(message) - sizeof(*trailer);
     trailer->message_integrity_check =
@@ -187,8 +219,7 @@ int main(void)
     for (;;)
     {
         rc = poll(pollfds, n, -1);
-        fprintf(stderr, "poll returned %d\n", rc);
-        // err(EXIT_FAILURE, "Poll returned");
+        //err(EXIT_FAILURE, "Poll returned");
         if (rc < 0)
             return EXIT_FAILURE;
 
