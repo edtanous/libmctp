@@ -280,18 +280,14 @@ void mctp_bus_rx(struct mctp *mctp, unsigned long bus_id,
 			mctp_msg_ctx_reset(ctx);
 		} else {
 			ctx = mctp_msg_ctx_create(mctp, hdr->src, tag);
-			if (((ctx->last_seq + 1) % 4) != seq) {
-				mctp_msg_ctx_drop(ctx);
-				return;
-			}
 		}
 
 		rc = mctp_msg_ctx_add_pkt(ctx, pkt);
-		if (rc) {
+		if (rc != 0) {
 			mctp_msg_ctx_drop(ctx);
-		} else {
-			ctx->last_seq = seq;
+			return;
 		}
+		ctx->last_seq = seq;
 
 		break;
 
@@ -301,17 +297,44 @@ void mctp_bus_rx(struct mctp *mctp, unsigned long bus_id,
 			return;
 
 		if (((ctx->last_seq + 1) % 4) != seq) {
+			mctp_prdebug(
+				"Sequence number %d does not match expected %d\n", seq,
+				((ctx->last_seq + 1) % 4));
 			mctp_msg_ctx_drop(ctx);
 			return;
 		}
 
 		rc = mctp_msg_ctx_add_pkt(ctx, pkt);
-		if (!rc) {
-			mctp->message_rx(bus->eid, mctp->message_rx_data,
-					ctx->buf, ctx->buf_size);
+		if (rc != 0) {
+			mctp_msg_ctx_drop(ctx);
+			return;
 		}
 
-		mctp_msg_ctx_drop(ctx);
+		mctp->message_rx(bus->eid, mctp->message_rx_data,
+				 ctx->buf, ctx->buf_size);
+		break;
+	default:
+		// Neither SOM nor EOM
+		ctx = mctp_msg_ctx_lookup(mctp, hdr->src, tag);
+		if (!ctx)
+			return;
+
+		if (((ctx->last_seq + 1) % 4) != seq)
+		{
+			mctp_prdebug(
+				"Sequence number %d does not match expected %d\n", seq,
+				    ((ctx->last_seq + 1) % 4));
+			mctp_msg_ctx_drop(ctx);
+			return;
+		}
+		rc = mctp_msg_ctx_add_pkt(ctx, pkt);
+		if (rc != 0)
+		{
+			mctp_msg_ctx_drop(ctx);
+			return;
+		}
+		ctx->last_seq = seq;
+
 		break;
 	}
 }
