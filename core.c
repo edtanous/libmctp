@@ -349,11 +349,13 @@ static int mctp_packet_tx(struct mctp *mctp __attribute__((unused)),
 int mctp_message_tx(struct mctp *mctp, mctp_eid_t eid,
 		void *msg, size_t msg_len)
 {
+	int r;
 	struct mctp_pktbuf *pkt, *tmp;
 	struct mctp_hdr *hdr;
 	struct mctp_bus *bus;
 	size_t pkt_len, p;
 
+	r = 0;
 	bus = find_bus_for_eid(mctp, eid);
 
 	/* queue up packets, each of max MCTP_MTU size */
@@ -389,16 +391,22 @@ int mctp_message_tx(struct mctp *mctp, mctp_eid_t eid,
 
 	/* send queued packets */
 	for (pkt = mctp->tx_queue_head; pkt;) {
-		mctp_prdebug("sending pkt, len %d",
-				mctp_pktbuf_size(pkt));
-		mctp_packet_tx(mctp, bus, pkt);
+
+		if (r == 0){
+			mctp_prdebug("sending pkt, len %d",
+				         mctp_pktbuf_size(pkt));
+			r = mctp_packet_tx(mctp, bus, pkt);
+		}
 		tmp = pkt->next;
+
 		mctp_pktbuf_free(pkt);
+
 		pkt = tmp;
 	}
+
 
 	mctp->tx_queue_tail = NULL;
 	mctp->tx_queue_head = NULL;
 
-	return 0;
+	return r;
 }
