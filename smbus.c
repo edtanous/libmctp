@@ -70,8 +70,6 @@ static int mctp_binding_smbus_tx(struct mctp_binding *b,
         uint8_t *buf;
         size_t len;
         int r;
-        //union i2c_smbus_data data;
-        //struct i2c_smbus_ioctl_data args;
         struct i2c_msg msg;
         struct i2c_rdwr_ioctl_data data;
 
