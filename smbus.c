@@ -12,31 +12,12 @@
 
 #define pr_fmt(x) "smbus: " x
 
-#include <i2c/smbus.h>
-#include <linux/i2c-dev.h>
-#include <linux/i2c.h>
 #include <sys/ioctl.h>
 
 #include "libmctp-alloc.h"
 #include "libmctp-log.h"
 #include "libmctp-smbus.h"
 #include "libmctp.h"
-
-struct mctp_binding_smbus {
-        struct mctp_binding binding;
-        struct mctp *mctp;
-        int out_fd;
-        int in_fd;
-
-        unsigned long bus_id;
-
-        /* receive buffer */
-        uint8_t rxbuf[1024];
-        struct mctp_pktbuf *rx_pkt;
-
-        /* temporary transmit buffer */
-        uint8_t txbuf[256];
-};
 
 #ifndef container_of
 #define container_of(ptr, type, member)                                        \
@@ -101,6 +82,7 @@ static int mctp_binding_smbus_tx(struct mctp_binding *b,
             mctp_prerr("Can't set slave");
             return -1;
         }
+
         if (ioctl(smbus->out_fd, I2C_PEC, 1) < 0) {
             mctp_prerr("Cant set PEC byte");
             return -1;
@@ -111,7 +93,6 @@ static int mctp_binding_smbus_tx(struct mctp_binding *b,
                 mctp_prerr("Failed to send");
                 return -1;
         }
-
         return 0;
 }
 
@@ -185,6 +166,91 @@ int mctp_smbus_get_in_fd(struct mctp_binding_smbus *smbus)
 int mctp_smbus_get_out_fd(struct mctp_binding_smbus *smbus)
 {
         return smbus->out_fd;
+}
+
+int mctp_smbus_open_out_bus(struct mctp_binding_smbus *smbus, int out_bus_num)
+{
+        char filename[60];
+        size_t size;
+
+        size = sizeof(filename);
+        snprintf(filename, size, "/dev/i2c-%d", out_bus_num);
+        filename[size - 1] = '\0';
+
+        smbus->out_fd = open(filename, O_RDWR | O_NONBLOCK);
+        if (smbus->out_fd < 0)
+        {
+                mctp_prerr("can't open device %s: %m", filename);
+        }
+        return 0;
+}
+
+int mctp_smbus_open_root_bus(int *in_fd,
+                             int root_bus_num)
+{
+        char filename[60];
+        size_t filename_size;
+        char slave_mqueue[20];
+        size_t mqueue_size;
+
+        int fd;
+
+        size_t size;
+        int address_7_bit;
+
+        address_7_bit = MCTP_SOURCE_SLAVE_ADDRESS >> 1;
+        size = sizeof(filename);
+        snprintf(
+            filename, size, "/sys/bus/i2c/devices/i2c-%d/%d-%04x/slave-mqueue",
+            root_bus_num, root_bus_num, (address_7_bit << 8) + address_7_bit);
+
+        *in_fd = open(filename, O_RDONLY | O_NONBLOCK | O_CLOEXEC);
+        if (*in_fd < 0)
+        {
+                // Device doesn't exist.  Create it.
+                filename_size = sizeof(filename);
+                snprintf(filename, filename_size,
+                         "/sys/bus/i2c/devices/i2c-%d/new_device",
+                         root_bus_num);
+                filename[filename_size - 1] = '\0';
+
+                fd = open(filename, O_WRONLY);
+                if (fd < 0)
+                {
+                        mctp_prerr("can't open root device %s: %m", filename);
+                        return -1;
+                }
+
+                mqueue_size = sizeof(slave_mqueue);
+                snprintf(slave_mqueue, mqueue_size, "slave-mqueue %#04x",
+                         (address_7_bit << 8) + address_7_bit);
+
+                size = write(fd, slave_mqueue, mqueue_size);
+                close(fd);
+                if (size != mqueue_size)
+                {
+                        mctp_prerr("can't create mqueue device on %s: %m",
+                                   filename);
+                        return -1;
+                }
+
+                size = sizeof(filename);
+                snprintf(filename, size,
+                         "/sys/bus/i2c/devices/i2c-%d/%d-%04x/slave-mqueue",
+                         root_bus_num, root_bus_num,
+                         (address_7_bit << 8) + address_7_bit);
+
+                *in_fd =
+                    open(filename, O_RDONLY | O_NONBLOCK | O_CLOEXEC);
+                if (*in_fd < 0)
+                {
+                        mctp_prerr("can't open mqueue device on %s: %m",
+                                   filename);
+                        return -2;
+                }
+        }
+
+        return 0;
 }
 
 int mctp_smbus_open_bus(struct mctp_binding_smbus *smbus, int out_bus_num,

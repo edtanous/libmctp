@@ -3,6 +3,11 @@
 #ifndef _NVMEMI_H
 #define _NVMEMI_H
 
+#ifdef __cplusplus
+extern "C"
+{
+#endif
+
 #include <stdint.h>
 #include <stdlib.h>
 
@@ -88,5 +93,8 @@ struct nvme_mi_controller_health {
         uint16_t composite_controller_status;
 };
 
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* _NVMEMI_H */
