@@ -12,12 +12,29 @@
 
 #define pr_fmt(x) "smbus: " x
 
+#include <i2c/smbus.h>
+#include <linux/i2c-dev.h>
+#include <linux/i2c.h>
 #include <sys/ioctl.h>
 
 #include "libmctp-alloc.h"
 #include "libmctp-log.h"
 #include "libmctp-smbus.h"
 #include "libmctp.h"
+
+struct mctp_binding_smbus
+{
+	struct mctp_binding binding;
+	struct mctp *mctp;
+	int out_fd;
+	int in_fd;
+	unsigned long bus_id;
+	/* receive buffer */
+	uint8_t rxbuf[1024];
+	struct mctp_pktbuf *rx_pkt;
+	/* temporary transmit buffer */
+	uint8_t txbuf[256];
+};
 
 #ifndef container_of
 #define container_of(ptr, type, member)                                        \

@@ -7,38 +7,22 @@
 extern "C"
 {
 #endif
-#include <i2c/smbus.h>
-#include <linux/i2c-dev.h>
+
 #include "libmctp.h"
 
-	struct mctp_binding_smbus
-	{
-		struct mctp_binding binding;
-		struct mctp *mctp;
-		int out_fd;
-		int in_fd;
+struct mctp_binding_smbus;
 
-		unsigned long bus_id;
-
-		/* receive buffer */
-		uint8_t rxbuf[1024];
-		struct mctp_pktbuf *rx_pkt;
-
-		/* temporary transmit buffer */
-		uint8_t txbuf[256];
-	};
-
-	struct mctp_binding_smbus *mctp_smbus_init(void);
-	int mctp_smbus_get_out_fd(struct mctp_binding_smbus *smbus);
-	int mctp_smbus_get_in_fd(struct mctp_binding_smbus *smbus);
-	void mctp_smbus_register_bus(struct mctp_binding_smbus *smbus,
-								 struct mctp *mctp, mctp_eid_t eid);
-	int mctp_smbus_read(struct mctp_binding_smbus *smbus);
-	int mctp_smbus_open_bus(struct mctp_binding_smbus *smbus, int out_bus_num,
-							int root_bus_num);
-	int mctp_smbus_open_root_bus(struct mctp_binding_smbus *smbus,
-                             int root_bus_num);
-	int mctp_smbus_open_out_bus(struct mctp_binding_smbus *smbus, int out_bus_num);
+struct mctp_binding_smbus *mctp_smbus_init(void);
+int mctp_smbus_get_out_fd(struct mctp_binding_smbus *smbus);
+int mctp_smbus_get_in_fd(struct mctp_binding_smbus *smbus);
+void mctp_smbus_register_bus(struct mctp_binding_smbus *smbus,
+							 struct mctp *mctp, mctp_eid_t eid);
+int mctp_smbus_read(struct mctp_binding_smbus *smbus);
+int mctp_smbus_open_bus(struct mctp_binding_smbus *smbus, int out_bus_num,
+						int root_bus_num);
+int mctp_smbus_open_root_bus(struct mctp_binding_smbus *smbus,
+                          int root_bus_num);
+int mctp_smbus_open_out_bus(struct mctp_binding_smbus *smbus, int out_bus_num);
 
 #ifdef __cplusplus
 }
