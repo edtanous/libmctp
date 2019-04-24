@@ -36,7 +36,7 @@ extern "C"
 	int mctp_smbus_read(struct mctp_binding_smbus *smbus);
 	int mctp_smbus_open_bus(struct mctp_binding_smbus *smbus, int out_bus_num,
 							int root_bus_num);
-	int mctp_smbus_open_root_bus(int *in_fd,
+	int mctp_smbus_open_root_bus(struct mctp_binding_smbus *smbus,
                              int root_bus_num);
 	int mctp_smbus_open_out_bus(struct mctp_binding_smbus *smbus, int out_bus_num);
 

@@ -185,7 +185,7 @@ int mctp_smbus_open_out_bus(struct mctp_binding_smbus *smbus, int out_bus_num)
         return 0;
 }
 
-int mctp_smbus_open_root_bus(int *in_fd,
+int mctp_smbus_open_root_bus(struct mctp_binding_smbus *smbus,
                              int root_bus_num)
 {
         char filename[60];
@@ -204,8 +204,8 @@ int mctp_smbus_open_root_bus(int *in_fd,
             filename, size, "/sys/bus/i2c/devices/i2c-%d/%d-%04x/slave-mqueue",
             root_bus_num, root_bus_num, (address_7_bit << 8) + address_7_bit);
 
-        *in_fd = open(filename, O_RDONLY | O_NONBLOCK | O_CLOEXEC);
-        if (*in_fd < 0)
+        smbus->in_fd = open(filename, O_RDONLY | O_NONBLOCK | O_CLOEXEC);
+        if (smbus->in_fd < 0)
         {
                 // Device doesn't exist.  Create it.
                 filename_size = sizeof(filename);
@@ -240,9 +240,9 @@ int mctp_smbus_open_root_bus(int *in_fd,
                          root_bus_num, root_bus_num,
                          (address_7_bit << 8) + address_7_bit);
 
-                *in_fd =
+                smbus->in_fd =
                     open(filename, O_RDONLY | O_NONBLOCK | O_CLOEXEC);
-                if (*in_fd < 0)
+                if (smbus->in_fd < 0)
                 {
                         mctp_prerr("can't open mqueue device on %s: %m",
                                    filename);
