@@ -3,7 +3,7 @@ cmake_minimum_required(VERSION 3.5 FATAL_ERROR)
 add_definitions(-DMCTP_LOG_STDERR)
 add_definitions(-DMCTP_FILEIO)
 
-add_library(mctp STATIC alloc.c core.c libmctp.h serial.c smbus.c)
+add_library(mctp STATIC alloc.c core.c libmctp.h serial.c smbus.c crc32c.c)
 
 target_include_directories(mctp
                            PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
@@ -23,4 +23,4 @@ target_link_libraries(mctp-smbus-test mctp i2c)
 install(TARGETS mctp-smbus-test DESTINATION bin)
 
 install(TARGETS mctp DESTINATION lib)
-install(FILES libmctp.h libmctp-smbus.h libmctp-serial.h nvme-mi.h DESTINATION include/mctp)
+install(FILES libmctp.h libmctp-smbus.h libmctp-serial.h nvme-mi.h crc32c.h DESTINATION include/mctp)
