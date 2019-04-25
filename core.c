@@ -366,6 +366,7 @@ int mctp_message_tx(struct mctp *mctp, mctp_eid_t eid,
 
 		pkt = mctp_pktbuf_alloc(pkt_len + sizeof(*hdr));
 		hdr = mctp_pktbuf_hdr(pkt);
+		pkt->next = NULL;
 
 		/* todo: tags */
 		hdr->ver = bus->binding->version & 0xf;
